@@ -7,24 +7,24 @@ const app = express();
 const port = process.env.PORT;
 
 // Googleスプレッドシート設定
-const KEYFILEPATH = path.join(__dirname, 'raceanalysisbot-461100-94f4c3011031.json'); // あなたの認証JSONファイル名
-const SPREADSHEET_ID = '1oY3EgNWp3rzgCILgOdnFEM4J9iPPFE238BYipOEziVc'; // スプレッドシートID
+const KEYFILEPATH = path.join(__dirname, 'raceanalysisbot-461100-94f4c3011031.json');
+const SPREADSHEET_ID = '1oY3EgNWp3rzgCILgOdnFEM4J9iPPFE238BYipOEziVc';
 
 // LINE設定
 const config = {
-  channelAccessToken: 'RtqsdAs4xmnJZYnyJ03p5Nuo7zTaImbCyFrPcxQrLBXXRz0y7G4GlU9qnbb8kYZ2spKu0ZLvnANAND5SF0a1jGhoI+CMY6fTRNtmPK8jRAtnHSgUMHivk7huxkEVwK4KCW+KeJi9JeTmdDTGziJInQdB04t89/1O/w1cDnyilFU=',
-  channelSecret: '269dad14802814e711d95cc535d34868',
+  channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
+  channelSecret: process.env.CHANNEL_SECRET,
 };
 
 const client = new line.Client(config);
 
-app.post('/webhook', express.json(), line.middleware(config), async (req, res) => {
+// ✅ Webhookエンドポイントにのみ middleware を使用
+app.post('/webhook', line.middleware(config), async (req, res) => {
   try {
     const events = req.body.events;
     for (const event of events) {
       if (event.type === 'message' && event.message.type === 'text') {
         const keyword = event.message.text.trim();
-
         const replyMessage = await createReplyMessage(keyword);
 
         if (replyMessage) {
@@ -39,11 +39,12 @@ app.post('/webhook', express.json(), line.middleware(config), async (req, res) =
     }
     res.sendStatus(200);
   } catch (error) {
-    console.error(error);
+    console.error('❌ Error in webhook handler:', error);
     res.sendStatus(500);
   }
 });
 
+// ✅ Googleスプレッドシートからデータ取得
 async function getSheetData() {
   const auth = new google.auth.GoogleAuth({
     keyFile: KEYFILEPATH,
@@ -61,21 +62,26 @@ async function getSheetData() {
   return res.data.values || [];
 }
 
+// ✅ Flex Messageの作成
 function createFlexLinks(rows, keyword) {
   const buttons = [];
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    if (row[0] && row[0].includes(keyword)) {
-      const raceName = row[2] || '-';
-      const raceDate = row[4] || '-';
+    const player = row[0] || '';
+    const raceName = row[2] || '';
+    const raceDate = row[4] || '';
+    const url = row[6] || '';
+
+    if (player.includes(keyword) && url) {
       buttons.push({
         type: "button",
         action: {
           type: "uri",
           label: `${raceName} (${raceDate})`,
-          uri: row[6] || 'https://example.com',
-        }
+          uri: url
+        },
+        margin: "md"
       });
     }
   }
@@ -90,26 +96,22 @@ function createFlexLinks(rows, keyword) {
       body: {
         type: "box",
         layout: "vertical",
-        contents: [
-          {
-            type: "box",
-            layout: "vertical",
-            margin: "md",
-            contents: buttons
-          }
-        ]
+        contents: buttons
       }
     }
   };
 }
 
+// ✅ 返信メッセージ作成
 async function createReplyMessage(keyword) {
   const rows = await getSheetData();
   return createFlexLinks(rows, keyword);
 }
 
+// ✅ サーバー起動（PORTはRender指定）
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+  console.log(`✅ Server is running on port ${port}`);
 });
+
 
 
