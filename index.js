@@ -4,7 +4,7 @@ const line = require('@line/bot-sdk');
 const path = require('path');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT;
 
 // Googleスプレッドシート設定
 const KEYFILEPATH = path.join(__dirname, 'raceanalysisbot-461100-94f4c3011031.json'); // あなたの認証JSONファイル名
@@ -18,9 +18,7 @@ const config = {
 
 const client = new line.Client(config);
 
-app.use(express.json());
-
-app.post('/webhook', line.middleware(config), async (req, res) => {
+app.post('/webhook', express.json(), line.middleware(config), async (req, res) => {
   try {
     const events = req.body.events;
     for (const event of events) {
